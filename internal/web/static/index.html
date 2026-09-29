@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InterLog - Analizador de Logs & Debugger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">InterLog <span class="brand-badge">QuickPay Debugger</span></div>
+          <div class="brand-subtitle" id="log-subtitle">Cargando telemetría del log...</div>
+        </div>
+      </div>
+
+      <!-- File Switcher & Upload Button -->
+      <div class="file-nav-controls">
+        <button class="btn-file-select" id="btn-open-files-modal" title="Haz clic para ver todos los logs registrados o cambiar de archivo">
+          <span class="dot pulse-emerald"></span>
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          <span class="active-file-name" id="active-file-label">20260515b.log.txt</span>
+          <span class="file-size-badge" id="header-filesize">114.9 MB</span>
+          <span class="file-chevron">▼</span>
+        </button>
+
+        <button class="btn btn-upload-nav" id="btn-quick-upload">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span>Subir Log</span>
+        </button>
+      </div>
+
+      <div class="header-stats">
+        <div class="stat-pill highlight" id="stat-speed-info">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span id="header-parsetime">Procesado en -- ms</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-body">
+      <!-- KPI Cards Row -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total de Líneas</div>
+          <div class="kpi-value" id="kpi-total-lines">--</div>
+          <div class="kpi-meta" id="kpi-duration">Rango: --</div>
+        </div>
+
+        <div class="kpi-card alert">
+          <div class="kpi-label">
+            <span>Errores Reales</span>
+            <span class="badge-alert-info">Muchos ocultos en INFO/DEBUG</span>
+          </div>
+          <div class="kpi-value error-text" id="kpi-real-errors">--</div>
+          <div class="kpi-meta">Vs solo <span id="kpi-declared-errors">0</span> declarados con nivel ERROR</div>
+        </div>
+
+        <div class="kpi-card warning">
+          <div class="kpi-label">Pagos Atorados (Reintentos)</div>
+          <div class="kpi-value warning-text" id="kpi-stuck-payments">--</div>
+          <div class="kpi-meta">Despachos fallando continuamente</div>
+        </div>
+
+        <div class="kpi-card hw">
+          <div class="kpi-label">Fallas Hardware Cajero</div>
+          <div class="kpi-value hw-text" id="kpi-hw-alerts">--</div>
+          <div class="kpi-meta">CCTALK y LCDM1000 con fallas</div>
+        </div>
+
+        <div class="kpi-card noise">
+          <div class="kpi-label">Ruido Descartable</div>
+          <div class="kpi-value dim-text" id="kpi-noise-percent">--%</div>
+          <div class="kpi-meta"><span id="kpi-noise-count">--</span> líneas de telemetría repetitiva</div>
+        </div>
+      </section>
+
+      <!-- Navigation Tabs -->
+      <div class="tabs-header">
+        <button class="tab-btn active" data-tab="explorer" id="tab-btn-explorer">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          Explorador de Logs
+        </button>
+        <button class="tab-btn" data-tab="payments" id="tab-btn-payments">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          Pagos Atorados en Cola <span class="badge-count" id="badge-payments-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="hardware" id="tab-btn-hardware">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          Dispositivos & Cajero <span class="badge-count" id="badge-hardware-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="exceptions" id="tab-btn-exceptions">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          Excepciones .NET <span class="badge-count" id="badge-exceptions-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="noise" id="tab-btn-noise">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          Análisis de Ruido
+        </button>
+        <button class="tab-btn" data-tab="ai" id="tab-btn-ai">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12L2.1 12.5"></path><path d="M12 12l4.5 8"></path></svg>
+          Diagnóstico con IA (Gemini) <span class="badge-gemini">Nuevo</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Log Explorer -->
+      <section class="tab-pane active" id="pane-explorer">
+        <!-- Filter Controls Bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="filter-query" placeholder="Buscar texto, método, despacho, GUID, error..." autocomplete="off">
+            <button class="clear-btn" id="btn-clear-query">&times;</button>
+          </div>
+
+          <!-- Date/Time Interval Filter (respects first and last log bounds) -->
+          <div class="time-range-group">
+            <div class="time-input-wrap">
+              <span class="time-label">Desde:</span>
+              <input type="datetime-local" id="filter-time-from" step="1" title="Fecha y hora inicial del intervalo">
+            </div>
+            <span class="time-separator">→</span>
+            <div class="time-input-wrap">
+              <span class="time-label">Hasta:</span>
+              <input type="datetime-local" id="filter-time-to" step="1" title="Fecha y hora final del intervalo">
+            </div>
+            <button class="btn-time-reset" id="btn-reset-time-range" title="Restablecer intervalo al rango completo del log (primer y último log)">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            </button>
+          </div>
+
+          <div class="control-group">
+            <label class="toggle-control" title="Oculta líneas repetitivas de lectura de parámetros y pings de BD">
+              <input type="checkbox" id="filter-hide-noise" checked>
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">Ocultar Ruido</span>
+            </label>
+
+            <label class="toggle-control danger" title="Solo muestra líneas con fallas reales">
+              <input type="checkbox" id="filter-only-errors">
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">Solo Errores</span>
+            </label>
+          </div>
+
+          <div class="select-group">
+            <select id="filter-category">
+              <option value="">Todas las Categorías</option>
+              <option value="PAYMENT">Pagos / Despachos</option>
+              <option value="HARDWARE">Hardware / Cajero</option>
+              <option value="PUMP">Bombas / Despachador</option>
+              <option value="EXCEPTION">Excepciones</option>
+              <option value="DATABASE">Base de Datos</option>
+              <option value="SOCKET">Sockets Gateway</option>
+              <option value="ROUTINE">Rutinas</option>
+            </select>
+
+            <select id="filter-level">
+              <option value="">Todos los Niveles</option>
+              <option value="ERROR">ERROR</option>
+              <option value="WARN">WARN</option>
+              <option value="INFO">INFO</option>
+              <option value="DEBUG">DEBUG</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Log Results Header / Counter -->
+        <div class="results-header">
+          <div class="results-count-wrap">
+            Mostrando <span class="highlight-num" id="page-showing-count">0</span> de <span class="highlight-num" id="page-total-count">0</span> eventos encontrados
+          </div>
+
+          <div class="results-header-actions">
+            <!-- Switch to show all rows / disable pagination -->
+            <div class="all-rows-toggle-wrap">
+              <label class="toggle-control secondary" title="Mostrar todos los resultados en una sola lista continua sin paginación">
+                <input type="checkbox" id="filter-all-rows">
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Sin paginar (todas las filas)</span>
+              </label>
+            </div>
+
+            <div class="pagination-controls" id="pagination-controls-group">
+              <button class="page-btn" id="btn-prev-page" disabled>&larr; Anterior</button>
+              <span class="page-indicator" id="page-current-indicator">Pág 1</span>
+              <button class="page-btn" id="btn-next-page">Siguiente &rarr;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linear Context Banner (visible when inspecting surrounding logs) -->
+        <div class="context-banner" id="linear-context-banner" style="display: none;">
+          <div class="context-banner-left">
+            <span class="context-pin-badge">📍 MODO CONTEXTO LINEAL</span>
+            <span class="context-desc">
+              Ubicación: <strong id="context-line-label">Línea #0</strong> (mostrando registros contiguos sin filtros)
+            </span>
+          </div>
+          <div class="context-banner-actions">
+            <button class="btn-context-nav" id="btn-context-more-before" title="Cargar 100 registros anteriores">⬆️ +100 Anteriores</button>
+            <button class="btn-context-nav" id="btn-context-more-after" title="Cargar 100 registros siguientes">⬇️ +100 Siguientes</button>
+            <button class="btn-context-return" id="btn-context-return" title="Restaurar búsqueda y filtros anteriores">
+              ↩️ Volver a mis filtros guardados
+            </button>
+          </div>
+        </div>
+
+        <!-- Log Entries Stream Table -->
+        <div class="log-stream-wrapper">
+          <div class="log-stream-header">
+            <div class="col-line">Línea</div>
+            <div class="col-time">Hora</div>
+            <div class="col-level">Nivel</div>
+            <div class="col-cat">Categoría</div>
+            <div class="col-comp">Componente / GUID</div>
+            <div class="col-msg">Mensaje / Evento</div>
+            <div class="col-act">Contexto</div>
+          </div>
+          <div class="log-stream-body" id="log-stream-list">
+            <div class="empty-state">Cargando eventos...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Stuck Payments -->
+      <section class="tab-pane" id="pane-payments">
+        <div class="pane-header-box">
+          <h2>Cola de Despachos Atorados</h2>
+          <p>
+            El sistema reintenta periódicamente enviar estos despachos pendientes al servidor local (Gateway 11001), 
+            pero el servidor responde con <code>ERROR|. Metodo RegistrarPago</code>. 
+            Esto genera decenas de miles de reintentos en bucle.
+          </p>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="payments-table">
+            <thead>
+              <tr>
+                <th>ID Despacho</th>
+                <th>Monto</th>
+                <th>Reintentos</th>
+                <th>Primer Registro</th>
+                <th>Último Reintento</th>
+                <th>Última Respuesta del Servidor</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="payments-tbody">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab 3: Hardware & Devices -->
+      <section class="tab-pane" id="pane-hardware">
+        <div class="pane-header-box">
+          <h2>Diagnóstico de Equipos del Cajero</h2>
+          <p>Alertas y fallas reportadas por los dispositivos conectados durante el periodo del log.</p>
+        </div>
+
+        <div class="hw-cards-grid" id="hw-cards-container">
+          <!-- Populated via JS -->
+        </div>
+
+        <h3 class="section-title">Registro Detallado de Alertas de Hardware</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Línea</th>
+                <th>Dispositivo</th>
+                <th>Código de Error</th>
+                <th>Descripción de la Falla</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="hw-alerts-tbody">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab 4: Exceptions -->
+      <section class="tab-pane" id="pane-exceptions">
+        <div class="pane-header-box">
+          <h2>Excepciones de Código .NET Detectadas</h2>
+          <p>Excepciones no controladas o capturadas en bloques de configuración y estadísticas.</p>
+        </div>
+
+        <div class="exceptions-grid" id="exceptions-list">
+          <!-- Populated via JS -->
+        </div>
+      </section>
+
+      <!-- Tab 5: Noise Analysis -->
+      <section class="tab-pane" id="pane-noise">
+        <div class="pane-header-box">
+          <h2>Análisis de Ruido y Saturación del Archivo</h2>
+          <p>
+            Lecturas fallidas de parámetros con valor por defecto, 
+            verificaciones redundantes de bases de datos y temporizadores de transición de pantallas.
+          </p>
+        </div>
+
+        <div class="noise-breakdown-grid" id="noise-cards-container">
+          <!-- Populated via JS -->
+        </div>
+      </section>
+
+      <!-- Tab 6: AI Diagnosis (Gemini) -->
+      <section class="tab-pane" id="pane-ai">
+        <!-- Configuration & API Key Card -->
+        <div class="ai-config-card">
+          <div class="ai-config-header">
+            <div class="ai-config-title">
+              <span class="ai-sparkle-icon">✨</span>
+              <div>
+                <h3>Configuración de Google AI Studio (Gemini)</h3>
+                <p>Diagnóstico de causa raíz enviando únicamente el extracto relevante del error para un costo mínimo.</p>
+              </div>
+            </div>
+            <div class="ai-config-status" id="ai-key-status-badge">
+              <span class="dot dot-amber"></span>
+              <span id="ai-key-status-text">Verificando API Key...</span>
+            </div>
+          </div>
+          <div class="ai-config-grid">
+            <div class="ai-input-field">
+              <label for="ai-api-key">Google AI Studio API Key:</label>
+              <div class="password-input-wrap">
+                <input type="password" id="ai-api-key" placeholder="Pega tu API Key de AI Studio (AIzaSy...)" autocomplete="off">
+                <button type="button" class="btn-toggle-eye" id="btn-toggle-api-key" title="Mostrar/Ocultar clave">👁️</button>
+              </div>
+              <span class="ai-field-tip">Se guarda localmente en tu navegador. Puedes obtener una clave gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio ↗</a>.</span>
+            </div>
+            <div class="ai-input-field">
+              <label for="ai-model-select">Modelo Gemini:</label>
+              <select id="ai-model-select">
+                <option value="gemini-flash-lite-latest" selected>gemini-flash-lite-latest (Recomendado - Ultrarrápido y estable)</option>
+                <option value="gemini-flash-latest">gemini-flash-latest (Gemini Flash estándar)</option>
+                <option value="gemini-pro-latest">gemini-pro-latest (Mayor capacidad de razonamiento)</option>
+                <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+              </select>
+              <span class="ai-field-tip">Gemini Flash es óptimo para análisis de trazas con respuesta en ~1 segundo.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 1: Search Anchor & Downward Scan -->
+        <div class="ai-step-card">
+          <div class="ai-step-badge">PASO 1</div>
+          <div class="ai-step-body">
+            <h3>Buscar Ancla y Descender hacia el Error</h3>
+            <p>Ingresa un término inicial (componente, ID de pago, timestamp o búsqueda). El motor avanzará en el log hasta encontrar el primer error real o anomalía.</p>
+
+            <div class="ai-search-row">
+              <div class="ai-search-input-wrap">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="ai-search-anchor" placeholder="Ej: LCDM1000, RegistrarPago, CCTALK, CA_4a66e4c0, o #2228" autocomplete="off">
+                <button class="clear-btn" id="btn-clear-ai-anchor">&times;</button>
+              </div>
+              <button class="btn btn-primary btn-ai-extract" id="btn-ai-extract">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+                <span>Buscar y Extraer Contexto</span>
+              </button>
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="ai-chips-wrap">
+              <span class="chips-label">Atajos de fallas identificadas:</span>
+              <button type="button" class="ai-chip" data-anchor="LCDM1000">🔧 LCDM1000 (Dispensador COM6)</button>
+              <button type="button" class="ai-chip" data-anchor="RegistrarPago">💳 RegistrarPago (Socket ERROR)</button>
+              <button type="button" class="ai-chip" data-anchor="CCTALK">🪙 CCTALK (Billetero Código 30)</button>
+              <button type="button" class="ai-chip" data-anchor="sensor_papel_habilitado">⚠️ sensor_papel (InvalidCast)</button>
+              <button type="button" class="ai-chip" data-anchor="CA_4a66e4c0">🔄 Despacho CA_4a66e4c0</button>
+            </div>
+
+            <!-- Parameters Grid -->
+            <div class="ai-params-grid">
+              <div class="ai-param-item">
+                <label for="ai-lines-before">Líneas previas al error:</label>
+                <input type="number" id="ai-lines-before" value="15" min="5" max="50">
+              </div>
+              <div class="ai-param-item">
+                <label for="ai-lines-after">Líneas posteriores:</label>
+                <input type="number" id="ai-lines-after" value="15" min="5" max="50">
+              </div>
+              <div class="ai-param-item">
+                <label for="ai-max-scan">Escaneo máx hacia abajo:</label>
+                <input type="number" id="ai-max-scan" value="500" min="50" max="3000">
+              </div>
+              <div class="ai-param-checkbox">
+                <label>
+                  <input type="checkbox" id="ai-hide-noise" checked>
+                  <span>Ocultar ruido operativo repetitivo en el bloque extraído</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Extracted Context Preview (Hidden until extracted) -->
+        <div class="ai-step-card hidden" id="ai-step-preview">
+          <div class="ai-step-badge step-success">PASO 2</div>
+          <div class="ai-step-body">
+            <div class="ai-preview-header">
+              <div>
+                <h3>Bloque de Contexto Obtenido</h3>
+                <p>Revisa el extracto antes de enviarlo a la IA para verificar la calidad del contexto y consumo de tokens.</p>
+              </div>
+              <div class="ai-preview-badges" id="ai-preview-badges">
+                <!-- Badges populated via JS -->
+              </div>
+            </div>
+
+            <div class="ai-code-viewer-container">
+              <div class="ai-code-toolbar">
+                <span class="ai-code-tag">Extracto limpio listo para Gemini</span>
+                <button class="btn btn-outline-sm" id="btn-copy-context">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copiar Contexto</span>
+                </button>
+              </div>
+              <pre class="ai-code-viewer" id="ai-code-viewer"></pre>
+            </div>
+
+            <div class="ai-prompt-override">
+              <label for="ai-custom-prompt">Pregunta o instrucción complementaria para la IA (opcional):</label>
+              <input type="text" id="ai-custom-prompt" placeholder="Ej: ¿Este error requiere reiniciar el cajero físico o se soluciona liberando el puerto COM?" autocomplete="off">
+            </div>
+
+            <div class="ai-action-bar">
+              <button class="btn btn-gemini-send" id="btn-ai-diagnose">
+                <span class="sparkle-gemini">✨</span>
+                <span>Mandar a analizar con IA (Gemini)</span>
+              </button>
+              <div class="ai-token-cost-hint" id="ai-token-cost-hint">
+                Consumo estimado: ~800 tokens (~$0.0001 USD)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: AI Diagnosis Result (Hidden until analyzed) -->
+        <div class="ai-step-card hidden" id="ai-step-diagnosis">
+          <div class="ai-step-badge step-ai">PASO 3</div>
+          <div class="ai-step-body">
+            <div class="ai-diagnosis-header">
+              <div class="ai-diagnosis-title">
+                <span class="ai-badge-gemini">Diagnóstico Generado</span>
+                <h3 id="ai-diagnosis-model-title">Causa Raíz y Solución</h3>
+              </div>
+              <button class="btn btn-outline-sm" id="btn-copy-diagnosis">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copiar Diagnóstico</span>
+              </button>
+            </div>
+
+            <!-- Loading Spinner State -->
+            <div class="ai-loading-state hidden" id="ai-loading-state">
+              <div class="ai-spinner"></div>
+              <div class="ai-loading-text">Consultando a Google Gemini con el extracto del log...</div>
+              <div class="ai-loading-subtext">Analizando secuencia cronológica, hardware y pasarela de pago.</div>
+            </div>
+
+            <!-- Rendered Output -->
+            <div class="ai-diagnosis-content markdown-body" id="ai-diagnosis-output">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal 1: Files Registry & Upload Manager -->
+    <div class="modal-overlay" id="files-modal">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <h3>Registro de Archivos & Carga de Logs</h3>
+            <span class="modal-subtitle">Sube nuevos archivos de log o selecciona uno guardado previamente</span>
+          </div>
+          <button class="modal-close" id="btn-close-files-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Drag and Drop Upload Area -->
+          <div class="upload-dropzone" id="upload-dropzone">
+            <input type="file" id="file-input-element" accept=".txt,.log" style="display:none;">
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="dropzone-title">Arrastra tu archivo de log aquí o <span class="dropzone-browse">haz clic para examinar</span></div>
+            <div class="dropzone-hint">Formatos: .log, .log.txt, .txt (<strong>Sin límite de tamaño</strong>: soporta 1 GB, 7 GB o más con streaming de bajo consumo). Se guardará en <code>uploads/</code>.</div>
+            
+            <div class="upload-progress-wrapper" id="upload-progress-wrapper">
+              <div class="upload-progress-bar" id="upload-progress-bar"></div>
+              <div class="upload-status-text" id="upload-status-text">Subiendo y analizando telemetría en streaming...</div>
+            </div>
+          </div>
+
+          <!-- Local Path Registration (Ideal for 7GB+ files already on disk) -->
+          <div class="local-path-box">
+            <div class="local-path-title">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              <span>¿Tienes un archivo de 7 GB o más ya guardado en disco? Regístralo por ruta directa (análisis instantáneo sin esperar la subida web):</span>
+            </div>
+            <div class="local-path-input-group">
+              <input type="text" id="input-local-path" placeholder="/ruta/completa/a/tu/log_enorme_7gb.log" autocomplete="off">
+              <button class="btn btn-primary" id="btn-register-local-path">Registrar & Indexar</button>
+            </div>
+          </div>
+
+          <!-- Saved Files Registry Table -->
+          <div class="files-registry-section">
+            <h4 class="section-title">Archivos Registrados en el Sistema</h4>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Fecha Registro</th>
+                    <th>Líneas</th>
+                    <th>Errores Reales</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="files-registry-tbody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-close-files-action">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 2: Log Row Details -->
+    <div class="modal-overlay" id="detail-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="modal-title">Detalle de Línea</h3>
+          <button class="modal-close" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-meta-grid" id="modal-meta"></div>
+          <div class="modal-code-header">Contenido Completo / Stacktrace / Consulta SQL:</div>
+          <pre class="modal-code" id="modal-code"></pre>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-modal-close-action">Cerrar</button>
+          <button class="btn btn-outline" id="btn-modal-context-action">📍 Ver en contexto lineal</button>
+          <button class="btn btn-gemini-modal" id="btn-modal-ai-action">🧠 Diagnosticar con IA</button>
+          <button class="btn btn-primary" id="btn-modal-trace-action">Rastrear Entidad</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
